@@ -11,7 +11,6 @@ def calculate_distance(point1, point2):
     return math.sqrt((point2[0] - point1[0]) ** 2 + (point2[1] - point1[1]) ** 2)
 
 def calculate_angle(a, b, c):
-    """计算三个点之间的夹角"""
     ba = a - b
     bc = c - b
     cos_angle = (ba @ bc) / (math.sqrt(ba @ ba) * math.sqrt(bc @ bc))
@@ -19,7 +18,6 @@ def calculate_angle(a, b, c):
     return angle
 
 def calculate_bounding_box_area(keypoints):
-    """根据关键点计算包围盒面积"""
     x_coords = [p[0] for p in keypoints]
     y_coords = [p[1] for p in keypoints]
     width = max(x_coords) - min(x_coords)
@@ -32,17 +30,17 @@ def determine_side(side,left_shoulder,left_hip,left_knee,left_ankle, right_shoul
     left_knee_x = left_knee[0]
     left_ankle_x = left_ankle[0]
 
-    # 右侧关节的x坐标
+
     right_shoulder_x = right_shoulder[0]
     right_hip_x = right_hip[0]
     right_knee_x = right_knee[0]
     right_ankle_x = right_ankle[0]
 
-    # 计算左侧和右侧关节x坐标的平均值
+
     left_side_avg_x = np.mean([left_shoulder_x, left_hip_x, left_knee_x, left_ankle_x])
     right_side_avg_x = np.mean([right_shoulder_x, right_hip_x, right_knee_x, right_ankle_x])
     if side == None:
-        # 根据x坐标的平均值选择最靠近镜头的一侧
+
         if left_side_avg_x < right_side_avg_x:
             side = 'left'
             selected_shoulder = left_shoulder
@@ -71,7 +69,6 @@ def determine_side(side,left_shoulder,left_hip,left_knee,left_ankle, right_shoul
 
 
 def plot_dynamic_chart(time_values, speed_values, knee_angles, hip_angles,video_length_seconds):
-    """绘制动态图表并返回BGR格式图像"""
     fig, ax = plt.subplots(3, 1, figsize=(5, 12))
 
     ax[0].set_xlim([0, video_length_seconds])
@@ -80,8 +77,8 @@ def plot_dynamic_chart(time_values, speed_values, knee_angles, hip_angles,video_
 
 
     ax[0].set_ylim([-1000,1000])
-    ax[1].set_ylim([0, 180])  # 膝盖角度通常在 0 到 180 度之间
-    ax[2].set_ylim([0, 180])  # 髋部角度通常也在 0 到 180 度之间
+    ax[1].set_ylim([0, 180]) 
+    ax[2].set_ylim([0, 180])  
 
     ax[0].plot(time_values, speed_values, label='Rise Speed (px/s)', color='b')
     ax[0].set_xlabel('Time (s)')

@@ -9,46 +9,46 @@ from src.utils import calculate_angle
 
 def split_video_by_squat(video_path, output_dir, yolo_model_path=None):
     """
-    使用深蹲检测逻辑将视频分割为多个片段
-    :param video_path: 输入视频路径
-    :param output_dir: 输出视频片段目录
-    :param yolo_model_path: YOLO 模型路径
-    :return: 分割视频的文件路径列表
+    Splits a video into multiple segments based on squat detection.
+    :param video_path: Path to the input video
+    :param output_dir: Directory to store the segmented video clips
+    :param yolo_model_path: Path to the YOLO model
+    :return: List of segmented video file paths
     """
-     # 如果未指定模型路径，则动态获取默认路径
+    # If the model path is not specified, dynamically get the default path
     if yolo_model_path is None:
         yolo_model_path = os.path.join(os.getcwd(), "models", "yolov8l-pose.pt")
 
-    # 检查模型路径是否存在
+    # Check if the YOLO model path exists
     if not os.path.exists(yolo_model_path):
         raise FileNotFoundError(f"YOLO model not found at {yolo_model_path}")
-    # 加载 YOLO 模型
+
+    # Load the YOLO model
     model = YOLO(yolo_model_path)
 
-    # 打开视频
+    # Open the video
     cap = cv2.VideoCapture(video_path)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'H264')
 
-    # 变量来跟踪深蹲的状态
+    # Variables to track squat status
     initial_shoulder_pos = None
     squat_start = False
     segment_count = 0
     current_video_writer = None
 
-    threshold_down = 20  # 用于检测肩膀显著下移的阈值（单位：像素）
-    threshold_up = 3 # 用于检测肩膀回到初始位置的阈值
-    threshold_horizontal = 30
+    threshold_down = 20  # Threshold (in pixels) for detecting significant downward shoulder movement
+    threshold_up = 3  # Threshold for detecting the shoulder returning to the initial position
+    threshold_horizontal = 30  # Threshold for horizontal movement
 
-    extra_frames = 15   # 深蹲结束后，延长的帧数
-    extra_frame_counter = 0
+    extra_frames = 15  # Number of additional frames to include after squat ends
 
     os.makedirs(output_dir, exist_ok=True)
     segment_files = []
 
-    results = model(video_path)  # 使用 YOLO 进行姿态检测
+    results = model(video_path)  # Perform pose detection using YOLO
     for result in results:
         ret, frame = cap.read()
         if not ret:
@@ -58,7 +58,7 @@ def split_video_by_squat(video_path, output_dir, yolo_model_path=None):
         max_area = 0
         largest_person = None
 
-        # 找到检测到的最大目标
+        # Find the largest detected person
         for keypoints in all_keypoints:
             area = calculate_bounding_box_area(keypoints)
             if area > max_area:
@@ -66,7 +66,7 @@ def split_video_by_squat(video_path, output_dir, yolo_model_path=None):
                 largest_person = keypoints
 
         if largest_person is not None:
-            # 获取左肩膀的坐标
+            # Get coordinates of key body joints
             side = None
             left_shoulder = largest_person[5][:2].cpu().numpy()
             left_hip = largest_person[11][:2].cpu().numpy()
@@ -78,16 +78,20 @@ def split_video_by_squat(video_path, output_dir, yolo_model_path=None):
             right_knee = largest_person[14][:2].cpu().numpy()
             right_ankle = largest_person[16][:2].cpu().numpy()
 
-            side, shoulder, hip, knee, ankle = determine_side(side, left_shoulder, left_hip, left_knee, left_ankle, right_shoulder, right_hip, right_knee, right_ankle)
+            side, shoulder, hip, knee, ankle = determine_side(
+                side, left_shoulder, left_hip, left_knee, left_ankle, 
+                right_shoulder, right_hip, right_knee, right_ankle
+            )
+
             if initial_shoulder_pos is None:
-                # 初始化肩膀的初始位置
+                # Initialize the shoulder position
                 initial_shoulder_pos = shoulder
                 continue
 
             shoulder_vertical_movement = shoulder[1] - initial_shoulder_pos[1]
             shoulder_horizontal_movement = abs(shoulder[0] - initial_shoulder_pos[0])
 
-            # 检测深蹲开始
+            # Detect the start of a squat
             if shoulder_vertical_movement > threshold_down and not squat_start and shoulder_horizontal_movement < threshold_horizontal:
                 squat_start = True
                 extra_frame_counter = 0
@@ -97,7 +101,7 @@ def split_video_by_squat(video_path, output_dir, yolo_model_path=None):
                 current_video_writer = cv2.VideoWriter(segment_file, fourcc, fps, (width, height))
                 print(f"Starting squat segment {segment_count}")
 
-            # 检测深蹲结束
+            # Detect the end of a squat
             elif shoulder_vertical_movement < threshold_up and squat_start:
                 if extra_frame_counter == 0:
                     print(f"Ending squat segment {segment_count}, but continuing for {extra_frames} more frames.")
@@ -109,12 +113,13 @@ def split_video_by_squat(video_path, output_dir, yolo_model_path=None):
                         current_video_writer = None
                     print(f"Completely ended squat segment {segment_count}")
 
-            # 写入帧到当前视频段
+            # Write the frame to the current video segment
             if squat_start or (extra_frame_counter > 0 and extra_frame_counter <= extra_frames):
                 if current_video_writer is not None:
                     current_video_writer.write(frame)
+
     cap.release()
     if current_video_writer:
         current_video_writer.release()
-             
+
     return segment_files
